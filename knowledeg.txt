@@ -1,0 +1,6 @@
+1. 重入攻击的预防方式（在swap函数那边有注释 或者查看文档 https://jeiwan.net/posts/programming-defi-uniswapv2-2/ 的Re-entrancy attacks and protection
+部分）
+2. TWAP
+3. Price oracle
+4. SSTORE 与 SLOAD 非常贵
+5. 为什么使用_safeTransfer而不是直接使用ERC20的接口transfer 
