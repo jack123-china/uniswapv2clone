@@ -10,6 +10,7 @@ interface IERC20{
     function transfer(address to, uint256 amount) external;
 }
 
+error AlreadyInitizlized();
 error BalanceOverflow();
 error InsufficientLiquidityMinted();
 error InsufficientLiquidityBurned();
@@ -37,15 +38,9 @@ contract uniswapv2clonePair is ERC20 , Math{
     event Sync(uint256 reserve0, uint256 reserve1);
     event Swap(address indexed sender, uint256 amount0out,uint256 amount1out, address indexed to);
 
+    constructor() ERC20("uniswapv2 pair","zunv2", 18){}
 
-    constructor(address token0_, address token1_)
-        ERC20("uniswapv2 pair","zunv2", 18)
-    {
-        token0 = token0_;
-        token1 = token1_;
-    }
-
-    function mint() public {
+    function mint(address to) public {
         (uint112 _reserve0,uint112 _reserve1, ) =getReserves();
         uint256 balance0 = IERC20(token0).balanceOf(address(this));
         uint256 balance1 = IERC20(token1).balanceOf(address(this));
@@ -67,10 +62,10 @@ contract uniswapv2clonePair is ERC20 , Math{
 
         if(liquidity <= 0)  revert  InsufficientLiquidityMinted();
 
-        _mint(msg.sender, liquidity);
-        _update(balance0 , balance1);
+        _mint(to, liquidity);
+        _update(balance0 , balance1,_reserve0,_reserve1);
 
-        emit Mint(msg.sender, amount0,amount1);
+        emit Mint(to, amount0,amount1);
     }
 
     function burn() public{
@@ -92,7 +87,9 @@ contract uniswapv2clonePair is ERC20 , Math{
         balance0 = IERC20(token0).balanceOf(address(this));
         balance1 = IERC20(token1).balanceOf(address(this));
 
-        _update(balance0, balance1);
+        (uint112 reserve0_, uint112 reserve1_ , ) = getReserves();
+
+        _update(balance0, balance1,reserve0_, reserve1_);
         emit Burn(msg.sender, amount0, amount1);
     }
     
@@ -113,7 +110,7 @@ contract uniswapv2clonePair is ERC20 , Math{
 
         (uint112 reserve0_, uint112 reserve1_, ) = getReserves();
 
-        if(amount0 > reserve0_ || amount1Out > reserve1_) 
+        if(amount0Out > reserve0_ || amount1Out > reserve1_) 
             revert InsufficientLiquidity();
 
         uint256 balance0 = IERC20(token0).balanceOf(address(this)) - amount0Out;
@@ -144,6 +141,14 @@ contract uniswapv2clonePair is ERC20 , Math{
         return (reserve0,reserve1,0);
     }
 
+    function initialize(address token0_, address token1_) public {
+        if(token0 != address(0) || token1 != address(0)) 
+            revert AlreadyInitizlized();
+        
+        token0 = token0_;
+        token1 = token1_;
+    }
+
 
     // function _update(uint256 balance0, uint256 balance1) private{
     //     reserve0 = uint112(balance0);
@@ -153,7 +158,7 @@ contract uniswapv2clonePair is ERC20 , Math{
     // }
 
     function _update(uint256 balance0, uint256 balance1,uint112 reserve0_,uint112 reserve1_) private{
-        if (balance0 > type(uint112).max || balance1 type(uint112).max) 
+        if (balance0 > type(uint112).max || balance1 > type(uint112).max) 
             revert BalanceOverflow();
 
         unchecked {
@@ -161,10 +166,10 @@ contract uniswapv2clonePair is ERC20 , Math{
 
             if(timeElapsed > 0 && reserve0_ > 0 && reserve1_ > 0){
                 price0Cumulativelast += 
-                    uint256(UQ112x112.encode(reserve1_).uqdiv(reserve0_)) * timeElapsed;
+                    uint256(UQ112x112.uqdiv( UQ112x112.encode(reserve1_),reserve0_)) * timeElapsed;
 
                 price1Cumulativelast += 
-                    uint256(UQ112x112.encode(reserve0_).uqdiv(reserve1_)) * timeElapsed;
+                    uint256(UQ112x112.uqdiv( UQ112x112.encode(reserve0_),reserve1_)) * timeElapsed;
             }
         }
 
